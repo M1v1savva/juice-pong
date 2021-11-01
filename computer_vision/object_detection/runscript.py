@@ -1,4 +1,4 @@
 from computer_vision.object_detection.ball_tracking import yolo_run
 
 if __name__ == "__main__":
-    output_frame = yolo_run()
+    yolo_run()

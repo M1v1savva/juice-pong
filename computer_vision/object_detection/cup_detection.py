@@ -23,8 +23,8 @@ def hough_transform(frame):
         for (x, y, r) in cups:
             # draw the circle in the output image, then draw a small rectangle at its center
             cups_center_point_list.append((x, y))
-            cv2.circle(output, (x, y), r, (0, 0, 255), 4)
-            cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (255, 0, 0), -1)
+            # cv2.circle(output, (x, y), r, (0, 0, 255), 4)
+            cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 0, 255), -1)
         num_cups_detected = len(cups)
 
     # # Convert to PIL Image

@@ -67,7 +67,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
     # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
-    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+    # (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     # Initialize
     set_logging()
@@ -189,8 +189,6 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         if classify:
             pred = apply_classifier(pred, modelc, img, im0s)
 
-        # trouver l'endrtoit ou rajouter le hough circle
-
         # Process predictions
         for i, det in enumerate(pred):  # per image
             seen += 1
@@ -206,6 +204,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+            ball_center_coordinate = ()
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -227,8 +226,8 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
                         annotator.box_label(xyxy, label, color=colors(c, True))
-                        ball_center_coordinate = (int((int(xyxy[0])+int(xyxy[2]))/2), int((int(xyxy[1])+int(xyxy[3]))/2))
-                        print('ball center coordinate =', ball_center_coordinate)
+                        ball_center_coordinate = (int((int(xyxy[0]) + int(xyxy[2])) / 2), int((int(xyxy[1]) + int(xyxy[3])) / 2))
+                        # print('ball center coordinate =', ball_center_coordinate)
                         if save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
@@ -241,9 +240,10 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             # cup detection
             im0, cups_center_coordinate = hough_transform(im0)
 
-            print('number of cups detected =', len(cups_center_coordinate))
-            print('cups center coordinate list =', cups_center_coordinate)
-            print('-----')
+            flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=30)
+            if flag:
+                cv2.circle(im0, (coordinate[0], coordinate[1]), 45, (0, 255, 0), 4)
+                print(f'Well done! {coordinate}')
 
             if view_img:
                 cv2.imshow(str(p), im0)
@@ -277,6 +277,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     if update:
         strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
 
+
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model path(s)')
@@ -308,6 +309,14 @@ def parse_opt():
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(FILE.stem, opt)
     return opt
+
+
+def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance):
+    if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
+        for c in cups_center_coordinates_list:
+            if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
+                return True, c
+    return False, ()
 
 
 def main(opt):
