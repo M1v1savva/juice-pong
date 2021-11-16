@@ -7,9 +7,11 @@ Usage:
 """
 
 import argparse
+import math
 import os
 import sys
 from pathlib import Path
+# from scipy.spatial import distance as dist
 
 import cv2
 import numpy as np
@@ -31,6 +33,26 @@ from utils.plots import Annotator, colors
 from utils.torch_utils import load_classifier, select_device, time_sync
 
 from computer_vision.object_detection.cup_detection import hough_transform
+
+
+def midpoint(ptA, ptB):
+    return (ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5
+
+
+def euclidean_dist(ptA, ptB, scale_fact):
+    if ptA[0] > ptB[0]:
+        sign = 1
+    else:
+        sign = -1
+    return (math.sqrt(math.pow(ptA[0] - ptB[0], 2) + math.pow(ptA[1] - ptB[1], 2)) / scale_fact) * sign
+
+
+def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance):
+    if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
+        for c in cups_center_coordinates_list:
+            if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
+                return True, c
+    return False, ()
 
 
 @torch.no_grad()
@@ -205,6 +227,8 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
             ball_center_coordinate = ()
+            qr_code_center_coordinate_list = []
+            qr_code_corner_coordinate_list = []
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -225,8 +249,14 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        annotator.box_label(xyxy, label, color=colors(c, True))
-                        ball_center_coordinate = (int((int(xyxy[0]) + int(xyxy[2])) / 2), int((int(xyxy[1]) + int(xyxy[3])) / 2))
+                        center_coordinate = int((int(xyxy[0]) + int(xyxy[2])) / 2), int((int(xyxy[1]) + int(xyxy[3])) / 2)
+                        if label[:-5] == 'ball':
+                            annotator.box_label(xyxy, label, color=colors(c, True))
+                            ball_center_coordinate = center_coordinate
+                        elif label[:-5] == 'qr_code':
+                            annotator.box_label(xyxy, 'qr' + label[-5:], color=(0, 0, 0))
+                            qr_code_center_coordinate_list.append(center_coordinate)
+                            qr_code_corner_coordinate_list.append(xyxy)
                         # print('ball center coordinate =', ball_center_coordinate)
                         if save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
@@ -240,10 +270,28 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             # cup detection
             im0, cups_center_coordinate = hough_transform(im0)
 
+            if len(qr_code_corner_coordinate_list) > 1:
+                D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
+                D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
+
+                cups_real_distance_list = []
+                for c in cups_center_coordinate:
+                    cups_real_distance_list.append((euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 9), euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 9)))
+                    cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
+                    cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
+
+                for idx in range(len(cups_real_distance_list)):
+                    text1_X, text1_Y = midpoint((cups_center_coordinate[idx][0], cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
+                    text2_X, text2_Y = midpoint((cups_center_coordinate[idx][0], cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
+                    cv2.putText(im0, str(round(cups_real_distance_list[idx][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                    cv2.putText(im0, str(round(cups_real_distance_list[idx][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+            else:
+                print('Both qr_codes not detected -> make free space around them')
+
             flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=30)
             if flag:
                 cv2.circle(im0, (coordinate[0], coordinate[1]), 45, (0, 255, 0), 4)
-                print(f'Well done! {coordinate}')
+                # print(f'Well done! {coordinate}')
 
             if view_img:
                 cv2.imshow(str(p), im0)
@@ -309,14 +357,6 @@ def parse_opt():
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(FILE.stem, opt)
     return opt
-
-
-def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance):
-    if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
-        for c in cups_center_coordinates_list:
-            if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
-                return True, c
-    return False, ()
 
 
 def main(opt):
