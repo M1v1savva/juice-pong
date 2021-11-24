@@ -24,8 +24,6 @@
 !cfg/yolov3*.cfg
 
 storage.googleapis.com
-runs/*
-data/*
 !data/hyps/*
 !data/images/zidane.jpg
 !data/images/bus.jpg
@@ -43,19 +41,7 @@ VOC/
 *.mat
 !targets*.mat
 
-# Neural Network weights -----------------------------------------------------------------------------------------------
-*.weights
-*.pt
-*.pb
-*.onnx
-*.mlmodel
-*.torchscript
-*.tflite
-*.h5
-*_saved_model/
-*_web_model/
-darknet53.conv.74
-yolov3-tiny.conv.15
+
 
 # GitHub Python GitIgnore ----------------------------------------------------------------------------------------------
 # Byte-compiled / optimized / DLL files

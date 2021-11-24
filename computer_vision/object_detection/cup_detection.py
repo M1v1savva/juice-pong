@@ -14,7 +14,7 @@ def hough_transform(frame):
     # cv2.imwrite('data/output/gray.png', gray)
 
     # detect cups in the image
-    cups = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1.8, minDist=40, minRadius=45, maxRadius=60)
+    cups = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1.8, minDist=40, minRadius=50, maxRadius=60)
     # ensure at least some cups were found
     if cups is not None:
         # convert the (x, y) coordinates and radius of the cups to integers

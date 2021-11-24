@@ -32,7 +32,9 @@ from utils.general import apply_classifier, check_img_size, check_imshow, check_
 from utils.plots import Annotator, colors
 from utils.torch_utils import load_classifier, select_device, time_sync
 
-from computer_vision.object_detection.cup_detection import hough_transform
+sys.path.append(os.path.dirname(os.path.abspath('README.md')) + '/computer_vision/object_detection')
+
+from cup_detection import hough_transform
 
 
 def midpoint(ptA, ptB):
@@ -81,6 +83,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
+        type=''
         ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -267,31 +270,32 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             # Stream results
             im0 = annotator.result()
 
-            # cup detection
-            im0, cups_center_coordinate = hough_transform(im0)
+            if type == 'overhead':
+                # cup detection
+                im0, cups_center_coordinate = hough_transform(im0)
 
-            if len(qr_code_corner_coordinate_list) > 1:
-                D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
-                D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
+                if len(qr_code_corner_coordinate_list) > 1:
+                    D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
+                    D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
 
-                cups_real_distance_list = []
-                for c in cups_center_coordinate:
-                    cups_real_distance_list.append((euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 9), euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 9)))
-                    cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
-                    cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
+                    cups_real_distance_list = []
+                    for c in cups_center_coordinate:
+                        cups_real_distance_list.append((euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12), euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12)))
+                        cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
+                        cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
 
-                for idx in range(len(cups_real_distance_list)):
-                    text1_X, text1_Y = midpoint((cups_center_coordinate[idx][0], cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
-                    text2_X, text2_Y = midpoint((cups_center_coordinate[idx][0], cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
-                    cv2.putText(im0, str(round(cups_real_distance_list[idx][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                    cv2.putText(im0, str(round(cups_real_distance_list[idx][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-            else:
-                print('Both qr_codes not detected -> make free space around them')
+                    for idx in range(len(cups_real_distance_list)):
+                        text1_X, text1_Y = midpoint((cups_center_coordinate[idx][0], cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
+                        text2_X, text2_Y = midpoint((cups_center_coordinate[idx][0], cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
+                        cv2.putText(im0, str(round(cups_real_distance_list[idx][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                        cv2.putText(im0, str(round(cups_real_distance_list[idx][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                else:
+                    print('Both qr_codes not detected -> make free space around them')
 
-            flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=30)
-            if flag:
-                cv2.circle(im0, (coordinate[0], coordinate[1]), 45, (0, 255, 0), 4)
-                # print(f'Well done! {coordinate}')
+                flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=35)
+                if flag:
+                    cv2.circle(im0, (coordinate[0], coordinate[1]), 57, (0, 255, 0), 4)
+                    # print(f'Well done! {coordinate}')
 
             if view_img:
                 cv2.imshow(str(p), im0)

@@ -330,7 +330,7 @@ def check_file(file, suffix=''):
         return files[0]  # return file
 
 
-def check_dataset(data, autodownload=True):
+def check_dataset(data, autodownload=True, train_data_path='', val_data_path=''):
     # Download and/or unzip dataset if not found locally
     # Usage: https://github.com/ultralytics/yolov5/releases/download/v1.0/coco128_with_yaml.zip
 
@@ -356,6 +356,10 @@ def check_dataset(data, autodownload=True):
     if 'names' not in data:
         data['names'] = [f'class{i}' for i in range(data['nc'])]  # assign class names if missing
     train, val, test, s = (data.get(x) for x in ('train', 'val', 'test', 'download'))
+    data['train'] = train_data_path
+    data['val'] = val_data_path
+    train = train_data_path
+    val = val_data_path
     if val:
         val = [Path(x).resolve() for x in (val if isinstance(val, list) else [val])]  # val path
         if not all(x.exists() for x in val):

@@ -61,7 +61,8 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 def train(hyp,  # path/to/hyp.yaml or hyp dictionary
           opt,
           device,
-          callbacks
+          callbacks,
+          cam_type=''
           ):
     save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze, = \
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.weights, opt.single_cls, opt.evolve, opt.data, opt.cfg, \
@@ -102,8 +103,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     cuda = device.type != 'cpu'
     init_seeds(1 + RANK)
     with torch_distributed_zero_first(LOCAL_RANK):
-        data_dict = data_dict or check_dataset(data)  # check if None
-    train_path, val_path = data_dict['train'], data_dict['val']
+        train_data_path = os.path.dirname(os.path.abspath('README.md')) + f'/computer_vision/data/{cam_type}/train_data/images/train'
+        val_data_path = os.path.dirname(os.path.abspath('README.md')) + f'/computer_vision/data/{cam_type}/train_data/images/val'
+        data_dict = data_dict or check_dataset(data, train_data_path, val_data_path)  # check if None
     nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = ['item'] if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
     assert len(names) == nc, f'{len(names)} names found for nc={nc} dataset in {data}'  # check
@@ -212,7 +214,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         LOGGER.info('Using SyncBatchNorm()')
 
     # Trainloader
-    train_loader, dataset = create_dataloader(train_path, imgsz, batch_size // WORLD_SIZE, gs, single_cls,
+    train_loader, dataset = create_dataloader(train_data_path, imgsz, batch_size // WORLD_SIZE, gs, single_cls,
                                               hyp=hyp, augment=True, cache=opt.cache, rect=opt.rect, rank=LOCAL_RANK,
                                               workers=workers, image_weights=opt.image_weights, quad=opt.quad,
                                               prefix=colorstr('train: '))
@@ -222,7 +224,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
 
     # Process 0
     if RANK in [-1, 0]:
-        val_loader = create_dataloader(val_path, imgsz, batch_size // WORLD_SIZE * 2, gs, single_cls,
+        val_loader = create_dataloader(val_data_path, imgsz, batch_size // WORLD_SIZE * 2, gs, single_cls,
                                        hyp=hyp, cache=None if noval else opt.cache, rect=True, rank=-1,
                                        workers=workers, pad=0.5,
                                        prefix=colorstr('val: '))[0]
@@ -471,6 +473,7 @@ def parse_opt(known=False):
     parser.add_argument('--freeze', type=int, default=0, help='Number of layers to freeze. backbone=10, all=24')
     parser.add_argument('--save-period', type=int, default=-1, help='Save checkpoint every x epochs (disabled if < 1)')
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
+    parser.add_argument('--cam_type', type=str, default='overhead_cam', help='camera angle type')
 
     # Weights & Biases arguments
     parser.add_argument('--entity', default=None, help='W&B: Entity')
@@ -521,7 +524,7 @@ def main(opt, callbacks=Callbacks()):
 
     # Train
     if not opt.evolve:
-        train(opt.hyp, opt, device, callbacks)
+        train(opt.hyp, opt, device, callbacks, cam_type=opt.cam_type)
         if WORLD_SIZE > 1 and RANK == 0:
             LOGGER.info('Destroying process group... ')
             dist.destroy_process_group()
@@ -602,7 +605,7 @@ def main(opt, callbacks=Callbacks()):
                 hyp[k] = round(hyp[k], 5)  # significant digits
 
             # Train mutation
-            results = train(hyp.copy(), opt, device, callbacks)
+            results = train(hyp.copy(), opt, device, callbacks, cam_type=opt.cam_type)
 
             # Write mutation results
             print_mutation(results, hyp.copy(), save_dir, opt.bucket)
