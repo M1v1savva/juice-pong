@@ -265,7 +265,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
             # Print time (inference-only)
-            # print(f'{s}Done. ({t3 - t2:.3f}s)')
+            print(f'{s}Done. ({t3 - t2:.3f}s)')
 
             # Stream results
             im0 = annotator.result()

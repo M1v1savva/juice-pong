@@ -22,8 +22,9 @@ def save_images():
 
 
 if __name__ == "__main__":
-    imgsz = 640
+    imgsz = 320
     cam_type = 'overhead'
     source = 0
-    yolo_run(imgsz=imgsz, cam_type=cam_type, weights_path=os.path.dirname(os.path.abspath('README.md')) + f'/computer_vision/weights/{cam_type}/640/last.pt', source=source)
+    # source = 'computer_vision/object_detection/streams.txt'
+    yolo_run(imgsz=imgsz, cam_type=cam_type, weights_path=os.path.dirname(os.path.abspath('README.md')) + f'/computer_vision/weights/{cam_type}/{imgsz}/last.pt', source=source)
     # save_images()
