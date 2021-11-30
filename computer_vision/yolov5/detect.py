@@ -58,7 +58,7 @@ def euclidean_dist(ptA, ptB, scale_fact=1, cam_type=''):
 
 
 def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance, ball_size):
-    if ball_size < 55:
+    if ball_size < 60:
         if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
             for c in cups_center_coordinates_list:
                 if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
@@ -158,7 +158,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     if webcam:
         view_img = check_imshow()
         cudnn.benchmark = True  # set True to speed up constant image size inference
-        dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt)
+        dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt, cam_type=cam_type)
         bs = len(dataset)  # batch_size
     else:
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
@@ -278,13 +278,12 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
             # Print time (inference-only)
             # print(f'{s}Done. ({t3 - t2:.3f}s)')
-            print(f'{int(1/(t3 - t1))} fps')
 
             # Stream results
             im0 = annotator.result()
 
-            if len(qr_code_corner_coordinate_list) > 1:
-                if cam_type == 'overhead':
+            if cam_type == 'overhead':
+                if len(qr_code_corner_coordinate_list) > 1:
                     im0, cups_center_coordinate = hough_transform(im0)
                     D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
                     D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
@@ -306,23 +305,25 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         cv2.circle(im0, (coordinate[0], coordinate[1]), 57, (0, 255, 0), 4)
                         # print(f'Well done! {coordinate}')
 
-                elif cam_type == 'front':
-                    D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
-                    D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
+                # elif cam_type == 'front':
+                #     D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
+                #     D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
                     
-                    ball_real_distance_list = []
-                    if len(ball_center_coordinate) > 1:
-                        ball_real_distance_list.append((euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12, cam_type), euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12, cam_type)))
-                        cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
-                        cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
+                #     ball_real_distance_list = []
+                #     if len(ball_center_coordinate) > 1:
+                #         ball_real_distance_list.append((euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12, cam_type), euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12, cam_type)))
+                #         cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
+                #         cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
 
-                        text1_X, text1_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
-                        text2_X, text2_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
-                        cv2.putText(im0, str(round(ball_real_distance_list[0][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                        cv2.putText(im0, str(round(ball_real_distance_list[0][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-            else:
-                print('Both qr_codes not detected -> make free space around them')
+                #         text1_X, text1_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
+                #         text2_X, text2_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
+                #         cv2.putText(im0, str(round(ball_real_distance_list[0][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                #         cv2.putText(im0, str(round(ball_real_distance_list[0][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                else:
+                    print('Both qr_codes not detected -> make free space around them')
 
+            t4 = time_sync()
+            print(f'{int(1/(t4 - t1))} fps')
 
             if view_img:
                 cv2.imshow(str(p), im0)
