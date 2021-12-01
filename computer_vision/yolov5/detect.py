@@ -252,6 +252,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 # Write results
+                best_ball = (0, '0', 0)
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -264,10 +265,12 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
                         center_coordinate = int((int(xyxy[0]) + int(xyxy[2])) / 2), int((int(xyxy[1]) + int(xyxy[3])) / 2)
                         if label[:-5] == 'ball':
-                            annotator.box_label(xyxy, label, color=colors(c, True))
-                            ball_center_coordinate = center_coordinate
-                            ball_size = euclidean_dist((int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])))
-                            # print(ball_size)
+                            # annotator.box_label(xyxy, label, color=colors(c, True))
+                            if float(label[-5:]) > float(best_ball[1][-5:]):
+                                best_ball = (xyxy, label, c)
+                                ball_center_coordinate = center_coordinate
+                                ball_size = euclidean_dist((int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])))
+                                # print(ball_size)
                         elif label[:-5] == 'qr_code':
                             annotator.box_label(xyxy, 'qr' + label[-5:], color=(0, 0, 0))
                             qr_code_center_coordinate_list.append(center_coordinate)
@@ -275,6 +278,8 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         # print('ball center coordinate =', ball_center_coordinate)
                         if save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                if best_ball[1] != '0':
+                    annotator.box_label(best_ball[0], best_ball[1], color=colors(best_ball[2], True))
 
             # Print time (inference-only)
             # print(f'{s}Done. ({t3 - t2:.3f}s)')

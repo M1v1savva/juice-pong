@@ -36,15 +36,17 @@ def save_images(source):
         print(i)
         cv2.imwrite(f'computer_vision/data/output/frames/new_cam{400+(i)}.png', frame)
 
-def yolo_detect(imgsz, source, cam_type):
-    yolo_run(imgsz=imgsz, cam_type=cam_type, weights_path=os.path.dirname(os.path.abspath('README.md')) + f'/computer_vision/weights/cam1_cam2/{imgsz}/last.pt', source=source)
+def yolo_detect(imgsz, source, cam_type, weights):
+    yolo_run(imgsz=imgsz, cam_type=cam_type, weights_path=os.path.dirname(os.path.abspath('README.md')) + f'/computer_vision/weights/{weights}/{imgsz}/last.pt', source=source)
 
 
 if __name__ == "__main__":
     # save_images(source=1)
 
-    yolo_detect(160, source=1, cam_type='front')
-    # yolo_detect(640, source=0, cam_type='overhead')
+    # yolo_detect(160, source=1, cam_type='front', weigths='cam1_cam2')
+    # yolo_detect(640, source=0, cam_type='overhead', weigths='cam1_cam2')
+
+    yolo_detect(320, source=0, cam_type='front', weights='cam2')
     
     # yolo_thread_overhead = yoloThread(imgsz=320, cam_type='overhead', source=0)
     # yolo_thread_front = yoloThread(imgsz=320, cam_type='front', source=2)
@@ -54,7 +56,7 @@ if __name__ == "__main__":
 
     # import cv2
 
-    # cap = cv2.VideoCapture(1)
+    # cap = cv2.VideoCapture(0)
 
     # # Check if the webcam is opened correctly
     # if not cap.isOpened():
