@@ -65,6 +65,12 @@ def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance,
                     return True, c
     return False, ()
 
+# def is_ball_thrown(flag, ball_size, human_boxes, threshold):
+#     if not flag:
+#         if ball_size > threshold:
+#             if 
+#                 flag = True
+
 
 @torch.no_grad()
 def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
@@ -169,6 +175,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     if pt and device.type != 'cpu':
         model(torch.zeros(1, 3, *imgsz).to(device).type_as(next(model.parameters())))  # run once
     dt, seen = [0.0, 0.0, 0.0], 0
+    flag = False
     for path, img, im0s, vid_cap in dataset:
         t1 = time_sync()
         if onnx:
@@ -275,7 +282,10 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                             annotator.box_label(xyxy, 'qr' + label[-5:], color=(0, 0, 0))
                             qr_code_center_coordinate_list.append(center_coordinate)
                             qr_code_corner_coordinate_list.append(xyxy)
-                        # print('ball center coordinate =', ball_center_coordinate)
+                        elif label[:-5] == 'human':
+                            annotator.box_label(xyxy, label, color=(100, 100, 0))
+                            qr_code_center_coordinate_list.append(center_coordinate)
+                            qr_code_corner_coordinate_list.append(xyxy)
                         if save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
                 if best_ball[1] != '0':
@@ -328,7 +338,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     print('Both qr_codes not detected -> make free space around them')
 
             t4 = time_sync()
-            print(f'{int(1/(t4 - t1))} fps')
+            # print(f'{int(1/(t4 - t1))} fps')
 
             if view_img:
                 cv2.imshow(str(p), im0)
