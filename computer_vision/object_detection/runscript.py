@@ -70,9 +70,15 @@ if __name__ == "__main__":
     # yolo_thread_front.start()
     
 
-    # import cv2
+    # fps = 90
+    # cap = cv2.VideoCapture(2)
+    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    # cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('m','j','p','g'))
+    # cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M','J','P','G'))
+    # cap.set(cv2.CAP_PROP_FPS, fps)
 
-    # cap = cv2.VideoCapture(0)
+    # print(cap.get(cv2.CAP_PROP_FPS))
 
     # # Check if the webcam is opened correctly
     # if not cap.isOpened():
@@ -81,10 +87,8 @@ if __name__ == "__main__":
     # while True:
     #     ret, frame = cap.read()
     #     # frame = cv2.resize(frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
-    #     cv2.imshow('Input', frame)
-
-    #     c = cv2.waitKey(1)
-    #     if c == 27:
+    #     cv2.imshow('image', frame)
+    #     if cv2.waitKey(1) & 0xFF == ord('q'):
     #         break
 
     # cap.release()
