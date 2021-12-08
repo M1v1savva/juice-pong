@@ -334,8 +334,8 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 #         text2_X, text2_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
                 #         cv2.putText(im0, str(round(ball_real_distance_list[0][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
                 #         cv2.putText(im0, str(round(ball_real_distance_list[0][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                else:
-                    print('Both qr_codes not detected -> make free space around them')
+                # else:
+                #     print('Both qr_codes not detected -> make free space around them')
 
             t4 = time_sync()
             # print(f'{int(1/(t4 - t1))} fps')
