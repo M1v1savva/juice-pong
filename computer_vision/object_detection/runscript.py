@@ -28,14 +28,14 @@ def grab_frame(cap):
 
 
 def save_images(source):
-    for i in range(0):
-        time.sleep(2)
+    for i in range(1):
+        # time.sleep(2)
         frame = cv2.VideoCapture(source)
-        # frame.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        # frame.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        frame.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        frame.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         frame = grab_frame(frame)
         print(i)
-        cv2.imwrite(f'computer_vision/data/output/frames/new_cam{450+(i)}.png', frame)
+        cv2.imwrite(f'computer_vision/data/output/frames/brio{200+(i)}.png', frame)
 
 def yolo_detect(imgsz, source, cam_type, weights):
     yolo_run(imgsz=imgsz, cam_type=cam_type, weights_path=os.path.dirname(os.path.abspath('README.md')) + f'/computer_vision/weights/{weights}/{imgsz}/last.pt', source=source)
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     # python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 0 --cam_type 'overhead' --weights 'cam1' & python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 1 --cam_type 'front' --weights 'cam2'
 
 
-    # save_images(source=1)
+    # save_images(source=0)
     
 
     # yolo_thread_overhead = yoloThread(imgsz=320, cam_type='overhead', source=0)
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     
 
     # fps = 90
-    # cap = cv2.VideoCapture(2)
+    # cap = cv2.VideoCapture(0)
     # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     # cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('m','j','p','g'))
@@ -97,13 +97,13 @@ if __name__ == "__main__":
 
     # import shutil, random
 
-    # source = 'computer_vision/new_frames'
-    # target = 'computer_vision/new_frames_shuffled'
+    # source = 'computer_vision/data/output/frames'
+    # target = 'computer_vision/data/output/shuffled_frames'
 
     # l = os.listdir(source)
     # random.shuffle(l)
-    # i = 242
+    # i = 0
     # for f in l:
     #     if not f.startswith('.'):
-    #         shutil.copyfile(f'{source}/{f}', f'{target}/new_front_cam_{i}.png')
+    #         shutil.copyfile(f'{source}/{f}', f'{target}/brio{i}.png')
     #         i+=1

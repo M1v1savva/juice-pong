@@ -58,7 +58,7 @@ def euclidean_dist(ptA, ptB, scale_fact=1, cam_type=''):
 
 
 def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance, ball_size):
-    if ball_size < 60:
+    if ball_size < 50:
         if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
             for c in cups_center_coordinates_list:
                 if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
@@ -279,9 +279,10 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                                 ball_size = euclidean_dist((int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])))
                                 # print(ball_size)
                         elif label[:-5] == 'qr_code':
-                            annotator.box_label(xyxy, 'qr' + label[-5:], color=(0, 0, 0))
-                            qr_code_center_coordinate_list.append(center_coordinate)
-                            qr_code_corner_coordinate_list.append(xyxy)
+                            if float(label[-5:]) > 0.8:
+                                annotator.box_label(xyxy, 'qr' + label[-5:], color=(0, 0, 0))
+                                qr_code_center_coordinate_list.append(center_coordinate)
+                                qr_code_corner_coordinate_list.append(xyxy)
                         elif label[:-5] == 'human':
                             annotator.box_label(xyxy, label, color=(100, 100, 0))
                             qr_code_center_coordinate_list.append(center_coordinate)
@@ -289,6 +290,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         if save_crop:
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
                 if best_ball[1] != '0':
+
                     annotator.box_label(best_ball[0], best_ball[1], color=colors(best_ball[2], True))
 
             # Print time (inference-only)
@@ -315,9 +317,9 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         cv2.putText(im0, str(round(cups_real_distance_list[idx][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
                         cv2.putText(im0, str(round(cups_real_distance_list[idx][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
                 
-                    flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=45, ball_size=ball_size)
+                    flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=35, ball_size=ball_size)
                     if flag:
-                        cv2.circle(im0, (coordinate[0], coordinate[1]), 57, (0, 255, 0), 4)
+                        cv2.circle(im0, (coordinate[0], coordinate[1]), 41, (0, 255, 0), 4)
                         # print(f'Well done! {coordinate}')
 
                 # elif cam_type == 'front':
