@@ -55,10 +55,11 @@ if __name__ == "__main__":
     opt = parse_opt()
     main(p=opt)
 
-    # python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 0 --cam_type 'overhead' --weights 'cam1'
-    # python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 1 --cam_type 'front' --weights 'cam2'
 
-    # python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 0 --cam_type 'overhead' --weights 'cam1' & python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 1 --cam_type 'front' --weights 'cam2'
+    # python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 0 --cam_type 'overhead' --weights 'brio'
+    # python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 5 --cam_type 'front' --weights 'cam2'
+
+    # python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 0 --cam_type 'overhead' --weights 'brio' & python3 computer_vision/object_detection/runscript.py --imgsz 320 --source 4 --cam_type 'front' --weights 'cam2'
 
 
     # save_images(source=0)

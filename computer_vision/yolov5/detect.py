@@ -44,11 +44,6 @@ def midpoint(ptA, ptB):
 def euclidean_dist(ptA, ptB, scale_fact=1, cam_type=''):
     if cam_type == 'overhead':
         if ptA[0] > ptB[0]:
-            sign = 1
-        else:
-            sign = -1
-    elif cam_type == 'front':
-        if ptA[1] > ptB[1]:
             sign = -1
         else:
             sign = 1
@@ -279,7 +274,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                                 ball_size = euclidean_dist((int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])))
                                 # print(ball_size)
                         elif label[:-5] == 'qr_code':
-                            if float(label[-5:]) > 0.8:
+                            if float(label[-5:]) > 0.6:
                                 annotator.box_label(xyxy, 'qr' + label[-5:], color=(0, 0, 0))
                                 qr_code_center_coordinate_list.append(center_coordinate)
                                 qr_code_corner_coordinate_list.append(xyxy)
@@ -300,27 +295,61 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             im0 = annotator.result()
 
             if cam_type == 'overhead':
-                if len(qr_code_corner_coordinate_list) > 1:
-                    im0, cups_center_coordinate = hough_transform(im0)
+                if len(qr_code_corner_coordinate_list) == 2:
+                    cups_center_coordinate = hough_transform(im0)
                     D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
                     D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
 
-                    cups_real_distance_list = []
+                    robot_cups_real_distance_list = []
+                    human_cups_real_distance_list = []
+                    robot_cups_center_coordinate = []
+                    human_cups_center_coordinate = []
                     for c in cups_center_coordinate:
-                        cups_real_distance_list.append((euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12, cam_type), euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12, cam_type)))
-                        cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
-                        cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
+                        dist_from_qr_1 = euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12, cam_type)
+                        dist_from_qr_2 = euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12, cam_type)
+                        if dist_from_qr_1 > 0 and dist_from_qr_2 > 0:
+                            human_cups_real_distance_list.append((dist_from_qr_1, dist_from_qr_2))
+                            human_cups_center_coordinate.append(c)
+                            cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
+                            cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
+                        else:
+                            robot_cups_real_distance_list.append((dist_from_qr_1, dist_from_qr_2))
+                            robot_cups_center_coordinate.append(c)
 
-                    for idx in range(len(cups_real_distance_list)):
-                        text1_X, text1_Y = midpoint((cups_center_coordinate[idx][0], cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
-                        text2_X, text2_Y = midpoint((cups_center_coordinate[idx][0], cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
-                        cv2.putText(im0, str(round(cups_real_distance_list[idx][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                        cv2.putText(im0, str(round(cups_real_distance_list[idx][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+
+                    for idx in range(len(human_cups_real_distance_list)):
+                        text1_X, text1_Y = midpoint((human_cups_center_coordinate[idx][0], human_cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
+                        text2_X, text2_Y = midpoint((human_cups_center_coordinate[idx][0], human_cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
+                        cv2.putText(im0, str(round(human_cups_real_distance_list[idx][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                        cv2.putText(im0, str(round(human_cups_real_distance_list[idx][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                    
+                    for coord in human_cups_center_coordinate:
+                        cv2.rectangle(im0, (coord[0]-5, coord[1]-5), (coord[0]+5, coord[1]+5), (0, 0, 255), -1)
+
+                    for coord in robot_cups_center_coordinate:
+                        cv2.rectangle(im0, (coord[0]-5, coord[1]-5), (coord[0]+5, coord[1]+5), (255, 0, 0), -1)
+
+                    if len(ball_center_coordinate) > 0:
+                        dist_from_qr_1 = euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12, cam_type)
+                        dist_from_qr_2 = euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12, cam_type)
+                        ball_real_distance = (dist_from_qr_1, dist_from_qr_2)
+                        cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (215, 255, 0), 2)
+                        cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (215, 255, 0), 2)
+
+                        text1_X, text1_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
+                        text2_X, text2_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
+                        cv2.putText(im0, str(round(ball_real_distance[0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
+                        cv2.putText(im0, str(round(ball_real_distance[1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
                 
                     flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=35, ball_size=ball_size)
                     if flag:
                         cv2.circle(im0, (coordinate[0], coordinate[1]), 41, (0, 255, 0), 4)
                         # print(f'Well done! {coordinate}')
+
+                    # human number of cups left
+                    cv2.putText(im0, f'Human: {str(len(human_cups_center_coordinate))}', (110, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                    # robot number of cups left
+                    cv2.putText(im0, f'Robot: {str(len(robot_cups_center_coordinate))}', (110, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
 
                 # elif cam_type == 'front':
                 #     D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
@@ -336,11 +365,20 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 #         text2_X, text2_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
                 #         cv2.putText(im0, str(round(ball_real_distance_list[0][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
                 #         cv2.putText(im0, str(round(ball_real_distance_list[0][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                # else:
-                #     print('Both qr_codes not detected -> make free space around them')
+                else:
+                    if len(qr_code_corner_coordinate_list) < 2:
+                        cv2.putText(im0, 'Error: please make free spaces around qr codes', (110, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                    elif len(qr_code_corner_coordinate_list) > 2:
+                        cv2.putText(im0, 'Error: More than 2 qr codes are detected', (110, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                        
 
             t4 = time_sync()
             # print(f'{int(1/(t4 - t1))} fps')
+            frame_rate = 1/(t4 - t1)
+            if frame_rate > 1:
+                cv2.putText(im0, f'{int(frame_rate)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+            else:
+                cv2.putText(im0, f'{round(frame_rate, 2)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
 
             if view_img:
                 cv2.imshow(str(p), im0)
