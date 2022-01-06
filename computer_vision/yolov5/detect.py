@@ -50,7 +50,8 @@ def euclidean_dist(ptA, ptB, scale_fact=1):
 
 
 def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance, ball_size):
-    if ball_size < 50:
+    # if ball_size < 50:
+    if ball_size < 70:
         if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
             for c in cups_center_coordinates_list:
                 if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
@@ -92,9 +93,13 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         dnn=False,  # use OpenCV DNN for ONNX inference
         cam_type=''
         ):
+    is_human_shot = False
     human_shot_counter = 0
+    human_cups_scored_counter = 0
+    ball_speed = 0
     ball_detected_coordinates = ()
     ball_size = sys.maxsize
+    saved_time = time_sync()
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
@@ -339,22 +344,38 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     cv2.putText(im0, str(round(ball_real_distance[0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
                     cv2.putText(im0, str(round(ball_real_distance[1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
 
-                    distance_limit = 350   # in pixels
-                    if len(ball_detected_coordinates) > 0 and euclidean_dist((ball_detected_coordinates[0], ball_detected_coordinates[1]), (ball_center_coordinate[0], ball_center_coordinate[1])) > distance_limit:
-                        human_shot_counter += 1
+                    speed_limit = 10   # in km/h
+                    time_limit = 3    # in sec
+                    if len(ball_detected_coordinates) > 0:
+                        real_distance_btw_balls = euclidean_dist((ball_detected_coordinates[0], ball_detected_coordinates[1]), (ball_center_coordinate[0], ball_center_coordinate[1]), ((D1+D2)/2)/12)
+                        ball_speed = (real_distance_btw_balls/100000)/((time_sync()-t4)/3600)
+                        if ball_speed > speed_limit and time_sync()-saved_time > time_limit:
+                            human_shot_counter += 1
+                            saved_time = time_sync()
+                            is_human_shot = True
+                    else:
+                        ball_speed = 0
                     ball_detected_coordinates = (ball_center_coordinate[0], ball_center_coordinate[1])
+
+                    shot_delay_tolerance = 1    # in sec
+                    flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=35, ball_size=ball_size)
+                    if flag:
+                        cv2.circle(im0, (coordinate[0], coordinate[1]), 50, (0, 255, 0), 4)
+                        if is_human_shot and time_sync()-saved_time < shot_delay_tolerance:
+                            is_human_shot = False
+                            human_cups_scored_counter += 1
                 else:
+                    ball_speed = 0
                     ball_detected_coordinates = ()
-                flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=35, ball_size=ball_size)
-                if flag:
-                    cv2.circle(im0, (coordinate[0], coordinate[1]), 50, (0, 255, 0), 4)
-                    # print(f'Well done! {coordinate}')
 
                 # human number of cups left
                 cv2.putText(im0, f'Human: {str(len(human_cups_center_coordinate))}', (110, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                 # robot number of cups left
                 cv2.putText(im0, f'Robot: {str(len(robot_cups_center_coordinate))}', (110, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
-                cv2.putText(im0, f'Human shot counter: {human_shot_counter}', (110, 650), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                cv2.putText(im0, f'Human (shot|scored) counter: ({human_shot_counter}|{human_cups_scored_counter})', (110, 640), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                if ball_speed < 0.2:
+                    ball_speed = 0
+                cv2.putText(im0, f'Ball speed (km/h): {abs(round(ball_speed, 2))}', (110, 690), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
             else:
                 if len(qr_code_corner_coordinate_list) < 2:
                     cv2.putText(im0, 'Error: please make free spaces around qr codes', (110, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
