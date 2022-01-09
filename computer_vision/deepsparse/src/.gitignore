@@ -1,0 +1,5 @@
+deepsparse/avx2/
+deepsparse/avx512/
+arch.bin
+cpu.py
+generated-version.py
