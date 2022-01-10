@@ -21,7 +21,6 @@ variables if using a different model.
 
 
 import glob
-import itertools
 import os
 import shutil
 import time
@@ -197,6 +196,11 @@ class YoloWebcamLoader:
         self._image_size = image_size
         self._stream = cv2.VideoCapture(self._camera)
         self._stream.set(cv2.CAP_PROP_BUFFERSIZE, 3)
+        self._stream.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self._stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        self._stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('m','j','p','g'))
+        self._stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M','J','P','G'))
+        self._stream.set(cv2.CAP_PROP_FPS, 60)
 
     def __iter__(self) -> Iterator[Tuple[numpy.ndarray, numpy.ndarray]]:
         while True:
@@ -545,192 +549,6 @@ def download_model_if_stub(path: str) -> str:
         print(f"model with stub {path} downloaded to {downloded_path}")
         return downloded_path
     return path
-
-
-_YOLO_CLASSES = [
-    "person",
-    "bicycle",
-    "car",
-    "motorcycle",
-    "airplane",
-    "bus",
-    "train",
-    "truck",
-    "boat",
-    "traffic light",
-    "fire hydrant",
-    "stop sign",
-    "parking meter",
-    "bench",
-    "bird",
-    "cat",
-    "dog",
-    "horse",
-    "sheep",
-    "cow",
-    "elephant",
-    "bear",
-    "zebra",
-    "giraffe",
-    "backpack",
-    "umbrella",
-    "handbag",
-    "tie",
-    "suitcase",
-    "frisbee",
-    "skis",
-    "snowboard",
-    "sports ball",
-    "kite",
-    "baseball bat",
-    "baseball glove",
-    "skateboard",
-    "surfboard",
-    "tennis racket",
-    "bottle",
-    "wine glass",
-    "cup",
-    "fork",
-    "knife",
-    "spoon",
-    "bowl",
-    "banana",
-    "apple",
-    "sandwich",
-    "orange",
-    "broccoli",
-    "carrot",
-    "hot dog",
-    "pizza",
-    "donut",
-    "cake",
-    "chair",
-    "couch",
-    "potted plant",
-    "bed",
-    "dining table",
-    "toilet",
-    "tv",
-    "laptop",
-    "mouse",
-    "remote",
-    "keyboard",
-    "cell phone",
-    "microwave",
-    "oven",
-    "toaster",
-    "sink",
-    "refrigerator",
-    "book",
-    "clock",
-    "vase",
-    "scissors",
-    "teddy bear",
-    "hair drier",
-    "toothbrush",
-]
-
-
-_YOLO_CLASS_COLORS = list(itertools.product([0, 255, 128, 64, 192], repeat=3))
-_YOLO_CLASS_COLORS.remove((255, 255, 255))  # remove white from possible colors
-
-
-def annotate_image(
-    img: numpy.ndarray,
-    outputs: numpy.ndarray,
-    score_threshold: float = 0.35,
-    model_input_size: Tuple[int, int] = None,
-    images_per_sec: Optional[float] = None,
-) -> numpy.ndarray:
-    """
-    Draws bounding boxes on predictions of a detection model
-
-    :param img: Original image to annotate (no pre-processing needed)
-    :param outputs: numpy array of nms outputs for the image from postprocess_nms
-    :param score_threshold: minimum score a detection should have to be annotated
-        on the image. Default is 0.35
-    :param model_input_size: 2-tuple of expected input size for the given model to
-        be used for bounding box scaling with original image. Scaling will not
-        be applied if model_input_size is None. Default is None
-    :param images_per_sec: optional images per second to annotate the left corner
-        of the image with
-    :return: the original image annotated with the given bounding boxes
-    """
-    img_res = numpy.copy(img)
-
-    boxes = outputs[:, 0:4]
-    scores = outputs[:, 4]
-    labels = outputs[:, 5].astype(int)
-
-    scale_y = img.shape[0] / (1.0 * model_input_size[0]) if model_input_size else 1.0
-    scale_x = img.shape[1] / (1.0 * model_input_size[1]) if model_input_size else 1.0
-
-    for idx in range(boxes.shape[0]):
-        label = labels[idx].item()
-        if scores[idx] > score_threshold:
-            annotation_text = (
-                f"{_YOLO_CLASSES[label]}: {scores[idx]:.0%}"
-                if 0 <= label < len(_YOLO_CLASSES)
-                else f"{scores[idx]:.0%}"
-            )
-
-            # bounding box points
-            left = boxes[idx][0] * scale_x
-            top = boxes[idx][1] * scale_y
-            right = boxes[idx][2] * scale_x
-            bottom = boxes[idx][3] * scale_y
-
-            # calculate text size
-            (text_width, text_height), text_baseline = cv2.getTextSize(
-                annotation_text,
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.9,  # font scale
-                2,  # thickness
-            )
-            text_height += text_baseline
-
-            # make solid background for annotation text
-            cv2.rectangle(
-                img_res,
-                (int(left), int(top) - 33),
-                (int(left) + text_width, int(top) - 28 + text_height),
-                _YOLO_CLASS_COLORS[label],
-                thickness=-1,  # filled solid
-            )
-
-            # add white annotation text
-            cv2.putText(
-                img_res,
-                annotation_text,
-                (int(left), int(top) - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.9,  # font scale
-                (255, 255, 255),  # white text
-                2,  # thickness
-                cv2.LINE_AA,
-            )
-
-            # draw bounding box
-            cv2.rectangle(
-                img_res,
-                (int(left), int(top)),
-                (int(right), int(bottom)),
-                _YOLO_CLASS_COLORS[label],
-                thickness=2,
-            )
-
-    if images_per_sec is not None:
-        cv2.putText(
-            img_res,
-            f"images_per_sec: {int(images_per_sec)}",
-            (50, 50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            2.0,  # font scale
-            (245, 46, 6),  # color
-            2,  # thickness
-            cv2.LINE_AA,
-        )
-    return img_res
 
 
 def _non_max_suppression(
