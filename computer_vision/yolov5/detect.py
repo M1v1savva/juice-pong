@@ -372,7 +372,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 # robot number of cups left
                 cv2.putText(im0, f'Robot: {str(len(robot_cups_center_coordinate))}', (110, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
                 cv2.putText(im0, f'Human (shot|scored) counter: ({human_shot_counter}|{human_cups_scored_counter})', (110, 640), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
-                if ball_speed < 0.2:
+                if abs(ball_speed) < 0.2:
                     ball_speed = 0
                 cv2.putText(im0, f'Ball speed (km/h): {abs(round(ball_speed, 2))}', (110, 690), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
             else:

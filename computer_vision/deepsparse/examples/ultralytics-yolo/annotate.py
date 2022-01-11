@@ -608,7 +608,7 @@ def annotate(args):
             # robot number of cups left
             cv2.putText(annotated_img, f'Robot: {str(len(robot_cups_center_coordinate))}', (110, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
             cv2.putText(annotated_img, f'Human (shot|scored) counter: ({human_shot_counter}|{human_cups_scored_counter})', (110, 640), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
-            if ball_speed < 0.2:
+            if abs(ball_speed) < 0.2:
                 ball_speed = 0
             cv2.putText(annotated_img, f'Ball speed (km/h): {abs(round(ball_speed, 2))}', (110, 690), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
         else:
