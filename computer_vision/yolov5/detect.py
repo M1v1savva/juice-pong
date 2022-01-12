@@ -51,18 +51,11 @@ def euclidean_dist(ptA, ptB, scale_fact=1):
 
 def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance, ball_size):
     # if ball_size < 50:
-    if ball_size < 70:
-        if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
-            for c in cups_center_coordinates_list:
-                if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
-                    return True, c
+    if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
+        for c in cups_center_coordinates_list:
+            if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
+                return True, c
     return False, ()
-
-# def is_ball_thrown(flag, ball_size, human_boxes, threshold):
-#     if not flag:
-#         if ball_size > threshold:
-#             if 
-#                 flag = True
 
 
 @torch.no_grad()
@@ -93,12 +86,16 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         dnn=False,  # use OpenCV DNN for ONNX inference
         ):
     is_human_shot = False
+    is_robot_shot = False
     human_shot_counter = 0
     human_cups_scored_counter = 0
+    robot_shot_counter = 0
+    robot_cups_scored_counter = 0
     ball_speed = 0
     ball_detected_coordinates = ()
     ball_size = sys.maxsize
     saved_time = time_sync()
+    turn_state = 0   # 0 for human, 1 for robot
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
@@ -277,7 +274,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                                 ball_size = euclidean_dist((int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])))
                                 # print(ball_size)
                         elif label[:-5] == 'qr_code':
-                            if float(label[-5:]) > 0.6:
+                            if float(label[-5:]) > 0.8:
                                 annotator.box_label(xyxy, 'qr' + label[-5:], color=(0, 0, 0))
                                 qr_code_center_coordinate_list.append(center_coordinate)
                                 qr_code_corner_coordinate_list.append(xyxy)
@@ -344,37 +341,51 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     cv2.putText(im0, str(round(ball_real_distance[1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
 
                     speed_limit = 10   # in km/h
-                    time_limit = 3    # in sec
+                    time_limit = 2    # in sec
                     if len(ball_detected_coordinates) > 0:
                         real_distance_btw_balls = euclidean_dist((ball_detected_coordinates[0], ball_detected_coordinates[1]), (ball_center_coordinate[0], ball_center_coordinate[1]), ((D1+D2)/2)/12)
                         ball_speed = (real_distance_btw_balls/100000)/((time_sync()-t4)/3600)
-                        if ball_speed > speed_limit and time_sync()-saved_time > time_limit:
+                        if turn_state == 0 and ball_speed > speed_limit and time_sync()-saved_time > time_limit:
                             human_shot_counter += 1
                             saved_time = time_sync()
                             is_human_shot = True
+                            turn_state = 1
+                        elif turn_state == 1 and ball_speed < (speed_limit*-1) and time_sync()-saved_time > time_limit:
+                            robot_shot_counter += 1
+                            saved_time = time_sync()
+                            is_robot_shot = True
+                            turn_state = 0
                     else:
                         ball_speed = 0
                     ball_detected_coordinates = (ball_center_coordinate[0], ball_center_coordinate[1])
 
-                    shot_delay_tolerance = 1    # in sec
-                    flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=35, ball_size=ball_size)
+                    min_shot_delay_tolerance = 1    # in sec
+                    max_shot_delay_tolerance = 2    # in sec
+                    if (is_human_shot or is_robot_shot) and time_sync()-saved_time > max_shot_delay_tolerance:
+                        is_human_shot = False
+                        is_robot_shot = False
+                    flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=40, ball_size=ball_size)
                     if flag:
                         cv2.circle(im0, (coordinate[0], coordinate[1]), 50, (0, 255, 0), 4)
-                        if is_human_shot and time_sync()-saved_time < shot_delay_tolerance:
+                        if is_human_shot and time_sync()-saved_time > min_shot_delay_tolerance and time_sync()-saved_time < max_shot_delay_tolerance:
                             is_human_shot = False
                             human_cups_scored_counter += 1
+                        elif is_robot_shot and time_sync()-saved_time > min_shot_delay_tolerance and time_sync()-saved_time < max_shot_delay_tolerance:
+                            is_robot_shot = False
+                            robot_cups_scored_counter += 1
                 else:
                     ball_speed = 0
                     ball_detected_coordinates = ()
 
                 # human number of cups left
-                cv2.putText(im0, f'Human: {str(len(human_cups_center_coordinate))}', (110, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                cv2.putText(im0, f'# Human cups: {str(len(human_cups_center_coordinate))}', (110, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                 # robot number of cups left
-                cv2.putText(im0, f'Robot: {str(len(robot_cups_center_coordinate))}', (110, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
-                cv2.putText(im0, f'Human (shot|scored) counter: ({human_shot_counter}|{human_cups_scored_counter})', (110, 640), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                cv2.putText(im0, f'# Robot cups: {str(len(robot_cups_center_coordinate))}', (110, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+                cv2.putText(im0, f'Human (scored | shot) counter: ({human_cups_scored_counter} | {human_shot_counter})', (110, 605), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                cv2.putText(im0, f'Robot (scored | shot) counter: ({robot_cups_scored_counter} | {robot_shot_counter})', (110, 655), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
                 if abs(ball_speed) < 0.2:
                     ball_speed = 0
-                cv2.putText(im0, f'Ball speed (km/h): {abs(round(ball_speed, 2))}', (110, 690), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                cv2.putText(im0, f'Ball speed (km/h): {abs(round(ball_speed, 2))}', (110, 705), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
             else:
                 if len(qr_code_corner_coordinate_list) < 2:
                     cv2.putText(im0, 'Error: please make free spaces around qr codes', (110, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
@@ -389,6 +400,11 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 cv2.putText(im0, f'{int(frame_rate)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
             else:
                 cv2.putText(im0, f'{round(frame_rate, 2)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+            
+            if turn_state == 0:
+                cv2.putText(im0, f'Human to play', (1000, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+            elif turn_state == 1:
+                cv2.putText(im0, f'Robot to play', (1000, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
 
             if view_img:
                 cv2.imshow(str(p), im0)

@@ -66,14 +66,13 @@ if __name__ == "__main__":
     #     raise IOError("Cannot open webcam")
 
     # i = 0
-    # stop = 100
+    # stop = 300
     # while True:
     #     ret, frame = cap.read()
     #     # frame = cv2.resize(frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
     #     # frame = grab_frame(frame)
     #     print(i)
-    #     time.sleep(0.5)
-    #     cv2.imwrite(f'computer_vision/data/output/frames/new_swarm_cam{i+550}.png', frame)
+    #     cv2.imwrite(f'computer_vision/data/frames/new_swarm_cam{i+563}.png', frame)
     #     i+=1
     #     if i == stop:
     #         break
@@ -87,12 +86,12 @@ if __name__ == "__main__":
 
     # import shutil, random
 
-    # source = 'computer_vision/data/output/frames'
-    # target = 'computer_vision/data/output/shuffled_frames'
+    # source = 'computer_vision/data/frames'
+    # target = 'computer_vision/data/shuf_frames'
 
     # l = os.listdir(source)
     # random.shuffle(l)
-    # i = 0
+    # i = 263
     # for f in l:
     #     if not f.startswith('.'):
     #         shutil.copyfile(f'{source}/{f}', f'{target}/new_swarm_cam{i}.png')
