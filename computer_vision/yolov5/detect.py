@@ -76,6 +76,15 @@ def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance,
     return False, ()
 
 
+def noisy(image, mean=0, var=0.1):
+    row, col, ch= image.shape
+    sigma = var**0.5
+    gauss = np.random.normal(mean,sigma,(row,col,ch))
+    gauss = gauss.reshape(row,col,ch)
+    noisy = image + gauss
+    return noisy
+
+
 @torch.no_grad()
 def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
@@ -192,6 +201,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     dt, seen = [0.0, 0.0, 0.0], 0
     flag = False
     for path, img, im0s, vid_cap in dataset:
+        # img = noisy(img, 0, 0.1)
         t1 = time_sync()
         if onnx:
             img = img.astype('float32')
@@ -366,17 +376,18 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     cv2.putText(im0, str(round(ball_real_distance[0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
                     cv2.putText(im0, str(round(ball_real_distance[1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
 
-                    speed_limit = 10   # in km/h
+                    min_speed_limit = 10   # in km/h
+                    max_speed_limit = 50   # in km/h
                     time_limit = 2    # in sec
                     if len(ball_detected_coordinates) > 0:
                         real_distance_btw_balls = euclidean_dist((ball_detected_coordinates[0], ball_detected_coordinates[1]), (ball_center_coordinate[0], ball_center_coordinate[1]), ((D1+D2)/2)/12)
                         ball_speed = (real_distance_btw_balls/100000)/((time_sync()-t4)/3600)
-                        if turn_state == 0 and ball_speed > speed_limit and time_sync()-saved_time > time_limit:
+                        if turn_state == 0 and ball_speed > min_speed_limit and ball_speed < max_speed_limit and time_sync()-saved_time > time_limit:
                             human_shot_counter += 1
                             saved_time = time_sync()
                             is_human_shot = True
                             turn_state = 1
-                        elif turn_state == 1 and ball_speed < (speed_limit*-1) and time_sync()-saved_time > time_limit:
+                        elif turn_state == 1 and ball_speed < (min_speed_limit*-1) and ball_speed  > (max_speed_limit*-1) and time_sync()-saved_time > time_limit:
                             robot_shot_counter += 1
                             saved_time = time_sync()
                             is_robot_shot = True
@@ -418,7 +429,6 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 elif len(qr_code_corner_coordinate_list) > 2:
                     cv2.putText(im0, 'Error: More than 2 qr codes are detected', (110, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                         
-
             t4 = time_sync()
             # print(f'{int(1/(t4 - t1))} fps')
             frame_rate = 1/(t4 - t1)
