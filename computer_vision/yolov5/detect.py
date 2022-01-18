@@ -416,6 +416,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         elif is_robot_shot and time_sync()-saved_time > min_shot_delay_tolerance and time_sync()-saved_time < max_shot_delay_tolerance:
                             is_robot_shot = False
                             robot_cups_scored_counter += 1
+                            coordinate_processor.drop_past_targets()
                 else:
                     ball_speed = 0
                     ball_detected_coordinates = ()

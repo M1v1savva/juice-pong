@@ -6,6 +6,9 @@ class coordinate_processor:
 	def __init__(self):
 		self.past_targets = []
 
+	def drop_past_targets():
+		self.past_targets = []
+
 	def throw_to_coordinates(self, coord=(600, 400)):
 		print('calculating the motors configuration...')
 		x, y = coord
@@ -53,25 +56,38 @@ class coordinate_processor:
 		b, a = val0
 		d, c = val1	
 
-		print(y0)
-		print(y1)
-
 		ans0 = a
 		ans1 = b + (y - y0)/(y1 - y0)*(d - b)
 
 		ans0 = round(ans0)
 		ans1 = round(ans1)
 
+		current_shot = (x, y, ans1, ans0, 0, 1)
+		prev_shot = None
+		for i in range(len(self.past_targets)):
+			x1, y1, ans11, ans01, cur_delta, cur_sign = self.past_targets[i]
+			if abs(x1 - x) + abs(y1 - y) < 10:
+				prev_shot = self.past_targets[i]
+				break
+	
+		if prev_shot != None:
+			print('found task')
+			self.past_targets.remove(prev_shot)
+			x1, y1, ans11, ans01, delta, sign = prev_shot
+			new_sign = 1 if sign == 0 else 0
+			new_delta = delta
+			if new_sign == 0:
+				new_delta += 5
+			new_mul = 1 if new_sign == 0 else -1
+			ans0 = ans0 + new_delta * new_mul
+
+			self.past_targets.append((x1, y1, ans11, ans01, new_delta, new_sign))
+		else:
+			self.past_targets.append(current_shot)
+
 		print(ans0)
 		print(ans1)
-
-		current_shot = (x, y, ans1, ans0)
-
-		# for i in range(len(past_targets)):
-		# 	x1, y1, ans11, ans01, cur_delta, cur_sign = past_targets[i]
-		# 	if abs(x1 - x) + abs(y1 - y) < 5:
-
-
+		
 		default_shot(bot_angle=ans1, delay=ans0, wait=5000)
 
 		# id0 = 0
