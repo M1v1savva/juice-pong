@@ -180,6 +180,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         model(torch.zeros(1, 3, *imgsz).to(device).type_as(next(model.parameters())))  # run once
     dt, seen = [0.0, 0.0, 0.0], 0
     flag = False
+    shot_time = 0
     for path, img, im0s, vid_cap in dataset:
         # img = noisy(img, 0, 0.1)
         t1 = time_sync()
@@ -278,7 +279,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         center_coordinate = int((int(xyxy[0]) + int(xyxy[2])) / 2), int((int(xyxy[1]) + int(xyxy[3])) / 2)
                         if label[:-5] == 'ball':
                             # annotator.box_label(xyxy, label, color=colors(c, True))
-                            if float(label[-5:]) > float(best_ball[1][-5:]):
+                            if float(label[-5:]) > 0.5 and float(label[-5:]) > float(best_ball[1][-5:]):
                                 best_ball = (xyxy, label, c)
                                 ball_center_coordinate = center_coordinate
                                 ball_size = euclidean_dist((int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])))
@@ -325,7 +326,6 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         robot_cups_real_distance_list.append((dist_from_qr_1, dist_from_qr_2))
                         robot_cups_center_coordinate.append(c)
 
-
                 for idx in range(len(human_cups_real_distance_list)):
                     text1_X, text1_Y = midpoint((human_cups_center_coordinate[idx][0], human_cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
                     text2_X, text2_Y = midpoint((human_cups_center_coordinate[idx][0], human_cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
@@ -350,22 +350,26 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     cv2.putText(im0, str(round(ball_real_distance[0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
                     cv2.putText(im0, str(round(ball_real_distance[1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
 
-                    min_speed_limit = 10   # in km/h
-                    max_speed_limit = 50   # in km/h
+                    min_speed_limit = 15   # in km/h
+                    max_speed_limit = 80   # in km/h
                     time_limit = 2    # in sec
                     if len(ball_detected_coordinates) > 0:
                         real_distance_btw_balls = euclidean_dist((ball_detected_coordinates[0], ball_detected_coordinates[1]), (ball_center_coordinate[0], ball_center_coordinate[1]), ((D1+D2)/2)/12)
                         ball_speed = (real_distance_btw_balls/100000)/((time_sync()-t4)/3600)
-                        if turn_state == 0 and ball_speed > min_speed_limit and ball_speed < max_speed_limit and time_sync()-saved_time > time_limit:
-                            human_shot_counter += 1
-                            saved_time = time_sync()
-                            is_human_shot = True
-                            turn_state = 1
-                        elif turn_state == 1 and ball_speed < (min_speed_limit*-1) and ball_speed  > (max_speed_limit*-1) and time_sync()-saved_time > time_limit:
-                            robot_shot_counter += 1
-                            saved_time = time_sync()
-                            is_robot_shot = True
-                            turn_state = 0
+                        delay_between_shots = 10   # in sec
+                        if time_sync()-shot_time > delay_between_shots:
+                            if turn_state == 0 and ball_speed > min_speed_limit and ball_speed < max_speed_limit and time_sync()-saved_time > time_limit:
+                                human_shot_counter += 1
+                                saved_time = time_sync()
+                                is_human_shot = True
+                                turn_state = 1
+                                shot_time = time_sync()
+                            elif turn_state == 1 and ball_speed < (min_speed_limit*-1) and ball_speed  > (max_speed_limit*-1) and time_sync()-saved_time > time_limit:
+                                robot_shot_counter += 1
+                                saved_time = time_sync()
+                                is_robot_shot = True
+                                turn_state = 0
+                                shot_time = time_sync()
                     else:
                         ball_speed = 0
                     ball_detected_coordinates = (ball_center_coordinate[0], ball_center_coordinate[1])
@@ -389,19 +393,23 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     ball_detected_coordinates = ()
 
                 # human number of cups left
-                cv2.putText(im0, f'# Human cups: {str(len(human_cups_center_coordinate))}', (110, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                cv2.putText(im0, f'# Human cups: {str(len(human_cups_center_coordinate))}', (60, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                 # robot number of cups left
-                cv2.putText(im0, f'# Robot cups: {str(len(robot_cups_center_coordinate))}', (110, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
-                cv2.putText(im0, f'Human (scored | shot) counter: ({human_cups_scored_counter} | {human_shot_counter})', (110, 605), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-                cv2.putText(im0, f'Robot (scored | shot) counter: ({robot_cups_scored_counter} | {robot_shot_counter})', (110, 655), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+                cv2.putText(im0, f'# Robot cups: {str(len(robot_cups_center_coordinate))}', (60, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+                cv2.putText(im0, f'Human (scored | shot): ({human_cups_scored_counter} | {human_shot_counter})', (60, 605), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                cv2.putText(im0, f'Robot (scored | shot): ({robot_cups_scored_counter} | {robot_shot_counter})', (60, 655), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
                 if abs(ball_speed) < 0.2:
                     ball_speed = 0
-                cv2.putText(im0, f'Ball speed (km/h): {abs(round(ball_speed, 2))}', (110, 705), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                cv2.putText(im0, f'Ball speed (km/h): {abs(round(ball_speed, 2))}', (60, 705), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                if time_sync()-shot_time < 10:
+                    cv2.putText(im0, f'Timer: {round((10-(time_sync()-shot_time)), 1)}', (60, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                else:
+                    cv2.putText(im0, f'Ready', (60, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 175, 0), 3)
             else:
                 if len(qr_code_corner_coordinate_list) < 2:
-                    cv2.putText(im0, 'Error: please make free spaces around qr codes', (110, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                    cv2.putText(im0, 'Error: please make free spaces around qr codes', (60, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                 elif len(qr_code_corner_coordinate_list) > 2:
-                    cv2.putText(im0, 'Error: More than 2 qr codes are detected', (110, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                    cv2.putText(im0, 'Error: More than 2 qr codes are detected', (60, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                         
             t4 = time_sync()
             # print(f'{int(1/(t4 - t1))} fps')
