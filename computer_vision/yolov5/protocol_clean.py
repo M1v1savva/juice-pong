@@ -63,7 +63,7 @@ def default_shot(bot_angle = 0, wait=5000,delay=0):
 # motor angles:
 # positive angles for mid and top motors throw execution
 # bot motor: positive angle to the left, negative to the right (looking from the cups towards the setup)
-#default_shot(bot_angle=-2, delay=200, wait=5000)
+default_shot(bot_angle=-2, delay=0, wait=5000)
 
 ####################### LOOK-UP TABLE ###############################
 #
