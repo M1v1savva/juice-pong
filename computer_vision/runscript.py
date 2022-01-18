@@ -46,6 +46,9 @@ if __name__ == "__main__":
     # cd computer_vision/sparseml/integrations/ultralytics-yolov5/yolov5
     # python3 detect.py --weights weights/pruned/640/best.pt --img-size 640 --source 0
 
+    # cd computer_vision/deepsparse/examples/ultralytics-yolo
+    # python3 annotate.py weights/pruned/640/best.onnx --source 2
+
 
     # save_images(source=0)
     

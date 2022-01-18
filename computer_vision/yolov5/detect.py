@@ -213,6 +213,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     shot_time = 0
     mean = 0.1
     var = 0.1
+    frame_rate_list = []
     for path, img, im0s, vid_cap in dataset:
 
         # img = gasuss_noise(img, mean=mean, var=var)
@@ -461,10 +462,13 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             t4 = time_sync()
             # print(f'{int(1/(t4 - t1))} fps')
             frame_rate = 1/(t4 - t1)
-            if frame_rate > 1:
-                cv2.putText(im0, f'{int(frame_rate)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+            if len(frame_rate_list) > 300:
+                frame_rate_list.pop(0)
+            frame_rate_list.append(frame_rate)
+            if np.mean(frame_rate_list) > 1:
+                cv2.putText(im0, f'{int(np.mean(frame_rate_list))} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
             else:
-                cv2.putText(im0, f'{round(frame_rate, 2)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                cv2.putText(im0, f'{round(np.mean(frame_rate_list), 2)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
             
             if turn_state == 0:
                 cv2.putText(im0, f'Human to play', (1000, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
