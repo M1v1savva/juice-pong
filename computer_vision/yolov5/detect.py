@@ -76,14 +76,23 @@ def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance,
                 return True, c
     return False, ()
 
-
-def noisy(image, mean=0, var=0.1):
-    row, col, ch= image.shape
-    sigma = var**0.5
-    gauss = np.random.normal(mean,sigma,(row,col,ch))
-    gauss = gauss.reshape(row,col,ch)
-    noisy = image + gauss
-    return noisy
+def gasuss_noise(image, mean=0, var=0.001):
+    ''' 
+                 Add Gaussian noise
+                 Mean: mean 
+                 Var: Various
+    '''
+    image = np.array(image/255, dtype=float)
+    noise = np.random.normal(mean, var ** 0.5, image.shape)
+    out = image + noise
+    if out.min() < 0:
+        low_clip = -1.
+    else:
+        low_clip = 0.
+    out = np.clip(out, low_clip, 1.0)
+    out = np.uint8(out*255)
+    #cv.imshow("gasuss", out)
+    return out
 
 
 @torch.no_grad()
@@ -202,8 +211,12 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     dt, seen = [0.0, 0.0, 0.0], 0
     flag = False
     shot_time = 0
+    mean = 0.1
+    var = 0.1
     for path, img, im0s, vid_cap in dataset:
-        # img = noisy(img, 0, 0.1)
+
+        # img = gasuss_noise(img, mean=mean, var=var)
+    
         t1 = time_sync()
         if onnx:
             img = img.astype('float32')
@@ -265,6 +278,10 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 p, s, im0, frame = path[i], f'{i}: ', im0s[i].copy(), dataset.count
             else:
                 p, s, im0, frame = path, '', im0s.copy(), getattr(dataset, 'frame', 0)
+
+            # cv2.imwrite(f'computer_vision/data/lights/4.png', im0)
+            # sys.exit()
+            # im0 = gasuss_noise(im0, mean=mean, var=var)
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
@@ -378,7 +395,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     cv2.putText(im0, str(round(ball_real_distance[0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
                     cv2.putText(im0, str(round(ball_real_distance[1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
 
-                    min_speed_limit = 15   # in km/h
+                    min_speed_limit = 10   # in km/h
                     max_speed_limit = 80   # in km/h
                     time_limit = 2    # in sec
                     if len(ball_detected_coordinates) > 0:

@@ -6,7 +6,7 @@ class coordinate_processor:
 	def __init__(self):
 		self.past_targets = []
 
-	def drop_past_targets():
+	def drop_past_targets(self):
 		self.past_targets = []
 
 	def throw_to_coordinates(self, coord=(600, 400)):
