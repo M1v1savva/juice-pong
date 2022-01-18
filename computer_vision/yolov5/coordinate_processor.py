@@ -3,10 +3,10 @@ import numpy as np
 
 class coordinate_processor:
 
-	def __init__():
+	def __init__(self):
 		self.past_targets = []
 
-	def throw_to_coordinates(coord=(600, 400)):
+	def throw_to_coordinates(self, coord=(600, 400)):
 		print('calculating the motors configuration...')
 		x, y = coord
 
@@ -67,9 +67,9 @@ class coordinate_processor:
 
 		current_shot = (x, y, ans1, ans0)
 
-		for i in range(len(past_targets)):
-			x1, y1, ans11, ans01, cur_delta, cur_sign = past_targets[i]
-			if abs(x1 - x) + abs(y1 - y) < 5:
+		# for i in range(len(past_targets)):
+		# 	x1, y1, ans11, ans01, cur_delta, cur_sign = past_targets[i]
+		# 	if abs(x1 - x) + abs(y1 - y) < 5:
 
 
 		default_shot(bot_angle=ans1, delay=ans0, wait=5000)
