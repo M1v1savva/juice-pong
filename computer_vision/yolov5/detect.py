@@ -42,6 +42,8 @@ from coordinate_processor import throw_to_coordinates
 cur_user = False
 already_shot = False
 
+coordinate_processor = coordinate_processor()
+
 def on_press(key):
     try:
         k = key.char  # single-char keys
@@ -51,10 +53,9 @@ def on_press(key):
         # self.keys.append(k)  # store it in global-like variable
         global cur_user
         global already_shot
-        cur_user ^= True
         already_shot = False
-        print('player switched')
-        print('current turn: human' if cur_user else 'current turn: robot')
+        cur_user = False
+        print('prepating to shoot')
 
 def midpoint(ptA, ptB):
     return (ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5
@@ -349,7 +350,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 global already_shot
                 if cur_user == False and already_shot == False and len(human_cups_center_coordinate) > 0:
                     print('shot fired')
-                    throw_to_coordinates(human_cups_center_coordinate[0])
+                    coordinate_processor.throw_to_coordinates(human_cups_center_coordinate[0])
                     already_shot = True
 
                 for idx in range(len(human_cups_real_distance_list)):
@@ -422,6 +423,8 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 cv2.putText(im0, f'Robot (scored | shot) counter: ({robot_cups_scored_counter} | {robot_shot_counter})', (110, 655), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
                 if abs(ball_speed) < 0.2:
                     ball_speed = 0
+                if abs(ball_speed) > 0:
+                    print(ball_speed)
                 cv2.putText(im0, f'Ball speed (km/h): {abs(round(ball_speed, 2))}', (110, 705), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
             else:
                 if len(qr_code_corner_coordinate_list) < 2:
