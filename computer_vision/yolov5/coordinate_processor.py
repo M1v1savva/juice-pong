@@ -4,10 +4,17 @@ import numpy as np
 class coordinate_processor:
 
 	def __init__(self):
-		self.past_targets = []
+		self.past_x = 0
+		self.past_y = 0
+		self.past_sign = -1
+		self.past_delta = 0
+
 
 	def drop_past_targets(self):
-		self.past_targets = []
+		self.past_x = 0
+		self.past_y = 0
+		self.past_sign = -1
+		self.past_delta = 0
 
 	def throw_to_coordinates(self, coord=(600, 400)):
 		print('calculating the motors configuration...')
@@ -15,8 +22,11 @@ class coordinate_processor:
 
 		print(coord)
 
-		xs = [444, 527, 597, 670]
-		ys = [137, 201, 273, 358, 434, 505, 601]
+		xs = [190, 100, 40, 0, -40]
+		ys = [70, 0, -80, -150, -225, -300, -380]
+
+		#xs = [444, 527, 597, 670]
+		#ys = [137, 201, 273, 358, 434, 505, 601]
 
 		ds = []
 		for i in xs:
@@ -30,9 +40,10 @@ class coordinate_processor:
 
 		conf = []
 
-		conf.append([(12, 80),  (7, 50),   (4, 50),  (-2, 50),  (-8, 50),   (-13, 50),  (-16, 80)])
-		conf.append([(12, 120), (9, 135),  (4, 135), (-2, 135), (-9, 135),  (-13, 135), (-16, 120)])
-		conf.append([(14, 145), (9, 165),  (5, 165), (-2, 165), (-10, 165), (-13, 165), (-16, 145)])
+		conf.append([(12, 50),  (7, 50),   (4, 50),  (-2, 50),  (-8, 50),   (-13, 50),  (-16, 50)])
+		conf.append([(12, 125), (9, 125),  (4, 125), (-2, 125), (-8, 125),  (-13, 125), (-16, 125)]) #135
+		conf.append([(14, 150), (9, 150),  (5, 150), (-2, 150), (-8, 150),  (-13, 150), (-16, 150)])
+		conf.append([(16, 160), (10, 170), (6, 170), (-2, 170), (-9, 170),  (-13, 170), (-18, 160)])
 		conf.append([(16, 160), (13, 185), (7, 200), (-2, 200), (-11, 200), (-15, 185), (-18, 160)])	
 
 		for i in conf:
@@ -45,7 +56,7 @@ class coordinate_processor:
 
 		id1 = 0
 		for i in range(len(ys)):
-			if ys[i] < y:
+			if ys[i] >= y:
 				id1 = i
 		print('id1 ' + str(id1))
 
@@ -66,28 +77,16 @@ class coordinate_processor:
 		ans0 = round(ans0)
 		ans1 = round(ans1)
 
-		current_shot = (x, y, ans1, ans0, 0, 1)
-		prev_shot = None
-		for i in range(len(self.past_targets)):
-			x1, y1, ans11, ans01, cur_delta, cur_sign = self.past_targets[i]
-			if abs(x1 - x) + abs(y1 - y) < 10:
-				prev_shot = self.past_targets[i]
-				break
-	
-		if prev_shot != None:
-			print('found task')
-			self.past_targets.remove(prev_shot)
-			x1, y1, ans11, ans01, delta, sign = prev_shot
-			new_sign = 1 if sign == 0 else 0
-			new_delta = delta
-			if new_sign == 0:
-				new_delta += 5
-			new_mul = 1 if new_sign == 0 else -1
-			ans0 = ans0 + new_delta * new_mul
-
-			self.past_targets.append((x1, y1, ans11, ans01, new_delta, new_sign))
+		if abs(x - self.past_x) + abs(y - self.past_y) < 15:
+			ans0 += self.past_sign * self.past_delta
+			self.past_sign = 1 if self.past_sign == -1 else -1
+			self.past_delta += 10 if self.past_sign == 1 else 0
 		else:
-			self.past_targets.append(current_shot)
+			self.past_x = x
+			self.past_y = y
+			self.past_sign = 1
+			self.past_delta = 10
+		
 
 		print(ans0)
 		print(ans1)

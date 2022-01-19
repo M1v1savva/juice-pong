@@ -40,7 +40,7 @@ from pynput import keyboard
 from coordinate_processor import coordinate_processor
 
 cur_user = False
-already_shot = False
+already_shot = True
 
 coordinate_processor = coordinate_processor()
 
@@ -56,6 +56,21 @@ def on_press(key):
         already_shot = False
         cur_user = False
         print('prepating to shoot')
+
+def get_relative(qr_code_center_coordinate_list, x, y):
+    x0 = qr_code_center_coordinate_list[0][0]
+    y0 = qr_code_center_coordinate_list[0][1]
+
+    x1 = qr_code_center_coordinate_list[1][0]
+    y1 = qr_code_center_coordinate_list[1][1]
+
+    y2 = min(y0, y1)
+    x2 = min(x0, x1)
+
+    x_new = x2 - x 
+    y_new = y2 - y
+
+    return x_new, y_new
 
 def midpoint(ptA, ptB):
     return (ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5
@@ -356,7 +371,10 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 for c in cups_center_coordinate:
                     dist_from_qr_1 = euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12)
                     dist_from_qr_2 = euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12)
-                    if dist_from_qr_1 > 0 and dist_from_qr_2 > 0:
+                    
+                    x0, y0 = get_relative(qr_code_center_coordinate_list, c[0], c[1])
+                    #if dist_from_qr_1 > 0 and dist_from_qr_2 > 0:
+                    if x0 >= -100:
                         human_cups_real_distance_list.append((dist_from_qr_1, dist_from_qr_2))
                         human_cups_center_coordinate.append(c)
                         cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
@@ -369,7 +387,10 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 global already_shot
                 if cur_user == False and already_shot == False and len(human_cups_center_coordinate) > 0:
                     print('shot fired')
-                    coordinate_processor.throw_to_coordinates(human_cups_center_coordinate[0])
+                    x_new, y_new = get_relative(qr_code_center_coordinate_list, human_cups_center_coordinate[0][0], human_cups_center_coordinate[0][1])
+                    print(x_new)
+                    print(y_new)
+                    coordinate_processor.throw_to_coordinates((x_new, y_new))
                     already_shot = True
 
                 for idx in range(len(human_cups_real_distance_list)):
