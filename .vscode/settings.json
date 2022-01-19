@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./computer_vision/sparseml/src"
+    ]
+}

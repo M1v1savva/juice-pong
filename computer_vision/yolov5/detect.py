@@ -36,35 +36,63 @@ sys.path.append(os.path.dirname(os.path.abspath('README.md')) + '/computer_visio
 
 from cup_detection import hough_transform
 
+from pynput import keyboard
+from coordinate_processor import coordinate_processor
+
+cur_user = False
+already_shot = False
+
+coordinate_processor = coordinate_processor()
+
+def on_press(key):
+    try:
+        k = key.char  # single-char keys
+    except:
+        k = key.name  # other keys
+    if k in ['enter']:  # keys of interest
+        # self.keys.append(k)  # store it in global-like variable
+        global cur_user
+        global already_shot
+        already_shot = False
+        cur_user = False
+        print('prepating to shoot')
 
 def midpoint(ptA, ptB):
     return (ptA[0] + ptB[0]) * 0.5, (ptA[1] + ptB[1]) * 0.5
 
-
-def euclidean_dist(ptA, ptB, scale_fact=1, cam_type=''):
-    if cam_type == 'overhead':
-        if ptA[0] > ptB[0]:
-            sign = -1
-        else:
-            sign = 1
+def euclidean_dist(ptA, ptB, scale_fact=1):
+    if ptA[0] > ptB[0]:
+        sign = -1
     else:
         sign = 1
     return (math.sqrt(math.pow(ptA[0] - ptB[0], 2) + math.pow(ptA[1] - ptB[1], 2)) / scale_fact) * sign
 
 
 def ball_in_cup(cups_center_coordinates_list, ball_center_coordinate, tolerance, ball_size):
-    if ball_size < 50:
-        if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
-            for c in cups_center_coordinates_list:
-                if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
-                    return True, c
+    # if ball_size < 50:
+    if len(ball_center_coordinate) > 0 and len(cups_center_coordinates_list) > 0:
+        for c in cups_center_coordinates_list:
+            if ball_center_coordinate[0] in range(c[0] - tolerance, c[0] + tolerance) and ball_center_coordinate[1] in range(c[1] - tolerance, c[1] + tolerance):
+                return True, c
     return False, ()
 
-# def is_ball_thrown(flag, ball_size, human_boxes, threshold):
-#     if not flag:
-#         if ball_size > threshold:
-#             if 
-#                 flag = True
+def gasuss_noise(image, mean=0, var=0.001):
+    ''' 
+                 Add Gaussian noise
+                 Mean: mean 
+                 Var: Various
+    '''
+    image = np.array(image/255, dtype=float)
+    noise = np.random.normal(mean, var ** 0.5, image.shape)
+    out = image + noise
+    if out.min() < 0:
+        low_clip = -1.
+    else:
+        low_clip = 0.
+    out = np.clip(out, low_clip, 1.0)
+    out = np.uint8(out*255)
+    #cv.imshow("gasuss", out)
+    return out
 
 
 @torch.no_grad()
@@ -93,9 +121,18 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
-        cam_type=''
         ):
+    is_human_shot = False
+    is_robot_shot = False
+    human_shot_counter = 0
+    human_cups_scored_counter = 0
+    robot_shot_counter = 0
+    robot_cups_scored_counter = 0
+    ball_speed = 0
+    ball_detected_coordinates = ()
     ball_size = sys.maxsize
+    saved_time = time_sync()
+    turn_state = 0   # 0 for human, 1 for robot
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
@@ -155,11 +192,13 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             int8 = input_details[0]['dtype'] == np.uint8  # is TFLite quantized uint8 model
     imgsz = check_img_size(imgsz, s=stride)  # check image size
 
+    listener = keyboard.Listener(on_press=on_press)
+    listener.start()  # start to listen on a separate thread
     # Dataloader
     if webcam:
         view_img = check_imshow()
         cudnn.benchmark = True  # set True to speed up constant image size inference
-        dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt, cam_type=cam_type)
+        dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt)
         bs = len(dataset)  # batch_size
     else:
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
@@ -171,7 +210,14 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         model(torch.zeros(1, 3, *imgsz).to(device).type_as(next(model.parameters())))  # run once
     dt, seen = [0.0, 0.0, 0.0], 0
     flag = False
+    shot_time = 0
+    mean = 0.1
+    var = 0.1
+    frame_rate_list = []
     for path, img, im0s, vid_cap in dataset:
+
+        # img = gasuss_noise(img, mean=mean, var=var)
+    
         t1 = time_sync()
         if onnx:
             img = img.astype('float32')
@@ -234,6 +280,10 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             else:
                 p, s, im0, frame = path, '', im0s.copy(), getattr(dataset, 'frame', 0)
 
+            # cv2.imwrite(f'computer_vision/data/lights/1_1.png', im0)
+            # sys.exit()
+            # im0 = gasuss_noise(im0, mean=mean, var=var)
+
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
@@ -268,13 +318,13 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         center_coordinate = int((int(xyxy[0]) + int(xyxy[2])) / 2), int((int(xyxy[1]) + int(xyxy[3])) / 2)
                         if label[:-5] == 'ball':
                             # annotator.box_label(xyxy, label, color=colors(c, True))
-                            if float(label[-5:]) > float(best_ball[1][-5:]):
+                            if float(label[-5:]) > 0.5 and float(label[-5:]) > float(best_ball[1][-5:]):
                                 best_ball = (xyxy, label, c)
                                 ball_center_coordinate = center_coordinate
                                 ball_size = euclidean_dist((int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])))
                                 # print(ball_size)
                         elif label[:-5] == 'qr_code':
-                            if float(label[-5:]) > 0.6:
+                            if float(label[-5:]) > 0.8:
                                 annotator.box_label(xyxy, 'qr' + label[-5:], color=(0, 0, 0))
                                 qr_code_center_coordinate_list.append(center_coordinate)
                                 qr_code_corner_coordinate_list.append(xyxy)
@@ -294,91 +344,136 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             # Stream results
             im0 = annotator.result()
 
-            if cam_type == 'overhead':
-                if len(qr_code_corner_coordinate_list) == 2:
-                    cups_center_coordinate = hough_transform(im0)
-                    D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
-                    D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
+            if len(qr_code_corner_coordinate_list) == 2:
+                cups_center_coordinate = hough_transform(im0)
+                D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
+                D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
 
-                    robot_cups_real_distance_list = []
-                    human_cups_real_distance_list = []
-                    robot_cups_center_coordinate = []
-                    human_cups_center_coordinate = []
-                    for c in cups_center_coordinate:
-                        dist_from_qr_1 = euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12, cam_type)
-                        dist_from_qr_2 = euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12, cam_type)
-                        if dist_from_qr_1 > 0 and dist_from_qr_2 > 0:
-                            human_cups_real_distance_list.append((dist_from_qr_1, dist_from_qr_2))
-                            human_cups_center_coordinate.append(c)
-                            cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
-                            cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
-                        else:
-                            robot_cups_real_distance_list.append((dist_from_qr_1, dist_from_qr_2))
-                            robot_cups_center_coordinate.append(c)
+                robot_cups_real_distance_list = []
+                human_cups_real_distance_list = []
+                robot_cups_center_coordinate = []
+                human_cups_center_coordinate = []
+                for c in cups_center_coordinate:
+                    dist_from_qr_1 = euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12)
+                    dist_from_qr_2 = euclidean_dist((c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12)
+                    if dist_from_qr_1 > 0 and dist_from_qr_2 > 0:
+                        human_cups_real_distance_list.append((dist_from_qr_1, dist_from_qr_2))
+                        human_cups_center_coordinate.append(c)
+                        cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
+                        cv2.line(im0, (c[0], c[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
+                    else:
+                        robot_cups_real_distance_list.append((dist_from_qr_1, dist_from_qr_2))
+                        robot_cups_center_coordinate.append(c)
 
+                global cur_user
+                global already_shot
+                if cur_user == False and already_shot == False and len(human_cups_center_coordinate) > 0:
+                    print('shot fired')
+                    coordinate_processor.throw_to_coordinates(human_cups_center_coordinate[0])
+                    already_shot = True
 
-                    for idx in range(len(human_cups_real_distance_list)):
-                        text1_X, text1_Y = midpoint((human_cups_center_coordinate[idx][0], human_cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
-                        text2_X, text2_Y = midpoint((human_cups_center_coordinate[idx][0], human_cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
-                        cv2.putText(im0, str(round(human_cups_real_distance_list[idx][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                        cv2.putText(im0, str(round(human_cups_real_distance_list[idx][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                    
-                    for coord in human_cups_center_coordinate:
-                        cv2.rectangle(im0, (coord[0]-5, coord[1]-5), (coord[0]+5, coord[1]+5), (0, 0, 255), -1)
-
-                    for coord in robot_cups_center_coordinate:
-                        cv2.rectangle(im0, (coord[0]-5, coord[1]-5), (coord[0]+5, coord[1]+5), (255, 0, 0), -1)
-
-                    if len(ball_center_coordinate) > 0:
-                        dist_from_qr_1 = euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12, cam_type)
-                        dist_from_qr_2 = euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12, cam_type)
-                        ball_real_distance = (dist_from_qr_1, dist_from_qr_2)
-                        cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (215, 255, 0), 2)
-                        cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (215, 255, 0), 2)
-
-                        text1_X, text1_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
-                        text2_X, text2_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
-                        cv2.putText(im0, str(round(ball_real_distance[0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
-                        cv2.putText(im0, str(round(ball_real_distance[1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
+                for idx in range(len(human_cups_real_distance_list)):
+                    text1_X, text1_Y = midpoint((human_cups_center_coordinate[idx][0], human_cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
+                    text2_X, text2_Y = midpoint((human_cups_center_coordinate[idx][0], human_cups_center_coordinate[idx][1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
+                    cv2.putText(im0, str(round(human_cups_real_distance_list[idx][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                    cv2.putText(im0, str(round(human_cups_real_distance_list[idx][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
                 
-                    flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=35, ball_size=ball_size)
+                for coord in human_cups_center_coordinate:
+                    cv2.rectangle(im0, (coord[0]-5, coord[1]-5), (coord[0]+5, coord[1]+5), (0, 0, 255), -1)
+
+                for coord in robot_cups_center_coordinate:
+                    cv2.rectangle(im0, (coord[0]-5, coord[1]-5), (coord[0]+5, coord[1]+5), (255, 0, 0), -1)
+
+                if len(ball_center_coordinate) > 0:
+                    dist_from_qr_1 = euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12)
+                    dist_from_qr_2 = euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12)
+                    ball_real_distance = (dist_from_qr_1, dist_from_qr_2)
+                    cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (215, 255, 0), 2)
+                    cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (215, 255, 0), 2)
+
+                    text1_X, text1_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
+                    text2_X, text2_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
+                    cv2.putText(im0, str(round(ball_real_distance[0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
+                    cv2.putText(im0, str(round(ball_real_distance[1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (140, 255, 0), 2)
+
+                    min_speed_limit = 10   # in km/h
+                    max_speed_limit = 80   # in km/h
+                    time_limit = 2    # in sec
+                    if len(ball_detected_coordinates) > 0:
+                        real_distance_btw_balls = euclidean_dist((ball_detected_coordinates[0], ball_detected_coordinates[1]), (ball_center_coordinate[0], ball_center_coordinate[1]), ((D1+D2)/2)/12)
+                        ball_speed = (real_distance_btw_balls/100000)/((time_sync()-t4)/3600)
+                        delay_between_shots = 10   # in sec
+                        if time_sync()-shot_time > delay_between_shots:
+                            if turn_state == 0 and ball_speed > min_speed_limit and ball_speed < max_speed_limit and time_sync()-saved_time > time_limit:
+                                human_shot_counter += 1
+                                saved_time = time_sync()
+                                is_human_shot = True
+                                turn_state = 1
+                                shot_time = time_sync()
+                            elif turn_state == 1 and ball_speed < (min_speed_limit*-1) and ball_speed  > (max_speed_limit*-1) and time_sync()-saved_time > time_limit:
+                                robot_shot_counter += 1
+                                saved_time = time_sync()
+                                is_robot_shot = True
+                                turn_state = 0
+                                shot_time = time_sync()
+                    else:
+                        ball_speed = 0
+                    ball_detected_coordinates = (ball_center_coordinate[0], ball_center_coordinate[1])
+
+                    min_shot_delay_tolerance = 1    # in sec
+                    max_shot_delay_tolerance = 2    # in sec
+                    if (is_human_shot or is_robot_shot) and time_sync()-saved_time > max_shot_delay_tolerance:
+                        is_human_shot = False
+                        is_robot_shot = False
+                    flag, coordinate = ball_in_cup(cups_center_coordinates_list=cups_center_coordinate, ball_center_coordinate=ball_center_coordinate, tolerance=40, ball_size=ball_size)
                     if flag:
-                        cv2.circle(im0, (coordinate[0], coordinate[1]), 41, (0, 255, 0), 4)
-                        # print(f'Well done! {coordinate}')
-
-                    # human number of cups left
-                    cv2.putText(im0, f'Human: {str(len(human_cups_center_coordinate))}', (110, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-                    # robot number of cups left
-                    cv2.putText(im0, f'Robot: {str(len(robot_cups_center_coordinate))}', (110, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
-
-                # elif cam_type == 'front':
-                #     D1 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[0][0]), (int(qr_code_corner_coordinate_list[0][1]))), (int(qr_code_corner_coordinate_list[0][2]), int(qr_code_corner_coordinate_list[0][3])), 1))
-                #     D2 = abs(euclidean_dist((int(qr_code_corner_coordinate_list[1][0]), (int(qr_code_corner_coordinate_list[1][1]))), (int(qr_code_corner_coordinate_list[1][2]), int(qr_code_corner_coordinate_list[1][3])), 1))
-                    
-                #     ball_real_distance_list = []
-                #     if len(ball_center_coordinate) > 1:
-                #         ball_real_distance_list.append((euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), D1 / 12, cam_type), euclidean_dist((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), D2 / 12, cam_type)))
-                #         cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]), (0, 215, 255), 2)
-                #         cv2.line(im0, (ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]), (0, 215, 255), 2)
-
-                #         text1_X, text1_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[0][0], qr_code_center_coordinate_list[0][1]))
-                #         text2_X, text2_Y = midpoint((ball_center_coordinate[0], ball_center_coordinate[1]), (qr_code_center_coordinate_list[1][0], qr_code_center_coordinate_list[1][1]))
-                #         cv2.putText(im0, str(round(ball_real_distance_list[0][0], 2)), (int(text1_X), int(text1_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
-                #         cv2.putText(im0, str(round(ball_real_distance_list[0][1], 2)), (int(text2_X), int(text2_Y - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 140, 255), 2)
+                        cv2.circle(im0, (coordinate[0], coordinate[1]), 50, (0, 255, 0), 4)
+                        if is_human_shot and time_sync()-saved_time > min_shot_delay_tolerance and time_sync()-saved_time < max_shot_delay_tolerance:
+                            is_human_shot = False
+                            human_cups_scored_counter += 1
+                        elif is_robot_shot and time_sync()-saved_time > min_shot_delay_tolerance and time_sync()-saved_time < max_shot_delay_tolerance:
+                            is_robot_shot = False
+                            robot_cups_scored_counter += 1
+                            coordinate_processor.drop_past_targets()
                 else:
-                    if len(qr_code_corner_coordinate_list) < 2:
-                        cv2.putText(im0, 'Error: please make free spaces around qr codes', (110, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-                    elif len(qr_code_corner_coordinate_list) > 2:
-                        cv2.putText(im0, 'Error: More than 2 qr codes are detected', (110, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-                        
+                    ball_speed = 0
+                    ball_detected_coordinates = ()
 
+                # human number of cups left
+                cv2.putText(im0, f'# Human cups: {str(len(human_cups_center_coordinate))}', (60, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                # robot number of cups left
+                cv2.putText(im0, f'# Robot cups: {str(len(robot_cups_center_coordinate))}', (60, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+                cv2.putText(im0, f'Human (scored | shot): ({human_cups_scored_counter} | {human_shot_counter})', (60, 605), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                cv2.putText(im0, f'Robot (scored | shot): ({robot_cups_scored_counter} | {robot_shot_counter})', (60, 655), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
+                if abs(ball_speed) < 0.2:
+                    ball_speed = 0
+
+                cv2.putText(im0, f'Ball speed (km/h): {abs(round(ball_speed, 2))}', (60, 705), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                if time_sync()-shot_time < 10:
+                    cv2.putText(im0, f'Timer: {round((10-(time_sync()-shot_time)), 1)}', (60, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                else:
+                    cv2.putText(im0, f'Ready', (60, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 175, 0), 3)
+            else:
+                if len(qr_code_corner_coordinate_list) < 2:
+                    cv2.putText(im0, 'Error: please make free spaces around qr codes', (60, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                elif len(qr_code_corner_coordinate_list) > 2:
+                    cv2.putText(im0, 'Error: More than 2 qr codes are detected', (60, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                        
             t4 = time_sync()
             # print(f'{int(1/(t4 - t1))} fps')
             frame_rate = 1/(t4 - t1)
-            if frame_rate > 1:
-                cv2.putText(im0, f'{int(frame_rate)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+            if len(frame_rate_list) > 300:
+                frame_rate_list.pop(0)
+            frame_rate_list.append(frame_rate)
+            if np.mean(frame_rate_list) > 1:
+                cv2.putText(im0, f'{int(np.mean(frame_rate_list))} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
             else:
-                cv2.putText(im0, f'{round(frame_rate, 2)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+                cv2.putText(im0, f'{round(np.mean(frame_rate_list), 2)} fps', (1100, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+            
+            if turn_state == 0:
+                cv2.putText(im0, f'Human to play', (1000, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+            elif turn_state == 1:
+                cv2.putText(im0, f'Robot to play', (1000, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
 
             if view_img:
                 cv2.imshow(str(p), im0)
