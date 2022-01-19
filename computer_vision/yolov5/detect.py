@@ -280,7 +280,7 @@ def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
             else:
                 p, s, im0, frame = path, '', im0s.copy(), getattr(dataset, 'frame', 0)
 
-            # cv2.imwrite(f'computer_vision/data/lights/4.png', im0)
+            # cv2.imwrite(f'computer_vision/data/lights/1_1.png', im0)
             # sys.exit()
             # im0 = gasuss_noise(im0, mean=mean, var=var)
 
